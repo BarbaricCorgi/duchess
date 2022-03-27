@@ -11,14 +11,17 @@ defmodule ISO8583 do
     << bitmap_hex::binary-size(8), bitmap_rest :: bitstring >> = header_rest
     bitmap = parse_bitmap(bitmap_hex)
 
-    parse_fields(fields_descriptors, bitmap, bitmap_rest, %{}, fields_descriptors[List.first(bitmap)][:content_type])
+    parse_fields(fields_descriptors, bitmap, bitmap_rest, %{},
+    fields_descriptors[List.first(bitmap)][:content_type],
+    fields_descriptors[List.first(bitmap)][:length_mode]
+    )
   end
 
 
   # Base case: if bits have run out, stop
-  def parse_fields(_, [], _, result_map, _), do: result_map
+  def parse_fields(_, [], _, result_map, _, _), do: result_map
 
-  def parse_fields(fields_descriptors, fields_list, hex, result_map, :numeric) do
+  def parse_fields(fields_descriptors, fields_list, hex, result_map, :numeric, :fixed) do
     [current_field | other_fields] = fields_list
     field_size = ceil(fields_descriptors[current_field][:length] / 2)
     << current_hex :: binary-size(field_size), rest_hex :: bitstring >> = hex
@@ -28,10 +31,12 @@ defmodule ISO8583 do
     current_hex )
     result_map = Map.put(result_map, current_field, field_value)
 
-    parse_fields(fields_descriptors, other_fields, rest_hex, result_map, fields_descriptors[List.first(other_fields)][:content_type])
+    parse_fields(fields_descriptors, other_fields, rest_hex, result_map,
+    fields_descriptors[List.first(other_fields)][:content_type],
+    fields_descriptors[List.first(other_fields)][:length_mode])
   end
 
-  def parse_fields(fields_descriptors, fields_list, hex, result_map, :alphanumeric) do
+  def parse_fields(fields_descriptors, fields_list, hex, result_map, :alphanumeric, :fixed) do
     [current_field | other_fields] = fields_list
     field_size = fields_descriptors[current_field][:length]
     << current_hex :: binary-size(field_size), rest_hex :: bitstring >> = hex
@@ -41,7 +46,24 @@ defmodule ISO8583 do
     current_hex )
     result_map = Map.put(result_map, current_field, field_value)
 
-    parse_fields(fields_descriptors, other_fields, rest_hex, result_map, fields_descriptors[List.first(other_fields)][:content_type])
+    parse_fields(fields_descriptors, other_fields, rest_hex, result_map,
+    fields_descriptors[List.first(other_fields)][:content_type],
+    fields_descriptors[List.first(other_fields)][:length_mode])
+  end
+
+  def parse_fields(fields_descriptors, fields_list, hex, result_map, :alphanumeric, :variable_lll) do
+    [current_field | other_fields] = fields_list
+    << size :: binary-size(2), size_rest_hex :: bitstring >> = hex
+
+    padded_size = Bcd.decode(<<0,0>> <> size)
+    << field_hex :: binary-size(padded_size), rest_hex :: bitstring >> = size_rest_hex
+
+    {:ok, field_value} = parse_field_alphanumeric(fields_descriptors[current_field][:length_mode], padded_size, field_hex )
+    result_map = Map.put(result_map, current_field, field_value)
+
+    parse_fields(fields_descriptors, other_fields, rest_hex, result_map,
+    fields_descriptors[List.first(other_fields)][:content_type],
+    fields_descriptors[List.first(other_fields)][:length_mode])
   end
 
   def parse_bitmap( bitmap_hex ) do
@@ -65,12 +87,14 @@ defmodule ISO8583 do
     {:error, :too_short, "Field too short: current length (#{byte_size(hex)}) is less than the minimum length of: #{length}"}
   end
 
-  def parse_field_alphanumeric( :fixed, _, hex ) do
+  def parse_field_alphanumeric( _, _, hex ) do
     {:ok, Enum.join(for <<c::utf8 <- hex>>, do: <<c::utf8>>)}
   end
 
-  def parse_field_numeric( :fixed, _, hex ) do
-    {:ok, parse_field_numeric(hex)}
+  def parse_field_numeric( :fixed, length, hex ) do
+    parsed_value = parse_field_numeric(hex)
+    right_aligned_value = String.slice(parsed_value, (String.length(parsed_value) - length)..String.length(parsed_value) )
+    {:ok, right_aligned_value}
   end
 
   def parse_field_numeric(<< digit :: 4, rest :: bitstring >>), do: Integer.to_string(digit) <> parse_field_numeric(rest)
