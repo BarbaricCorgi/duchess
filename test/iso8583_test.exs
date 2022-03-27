@@ -4,20 +4,6 @@ defmodule ISO8583Test do
 
   doctest ISO8583
 
-  _ = """
-  12:
-  0: [0210]
-  3: [000000]
-  11: [000398]
-  12: [092323]
-  13: [0326]
-  24: [002]
-  37: [208509220622]
-  39: [51]
-  41: [00057441]
-  54: [303030303030303030303030]
-  """
-
   test "Parses bitmap" do
     message_0210_bitmap_hex = <<0x20, 0x38, 0x01, 0x00, 0x0A, 0x80, 0x04, 0x00>>
 
@@ -61,443 +47,194 @@ defmodule ISO8583Test do
     assert {:ok, "FF0032A9"} = ISO8583.parse_field_binary(:fixed, 4, binary_field_hex)
   end
 
-  test "Parses 0210 message" do
-    # ISO8583 - 1987
-    fields_descriptors = %{
-      "MTI" => %{
-        label: "Message Type Indicator",
-        content_type: :numeric,
-        length_mode: :fixed,
-        length: 4
-      },
-      2 => %{
-        label: "Primary account number (PAN)",
-        content_type: :numeric,
-        length_mode: :variable_ll,
-        length: 19
-      },
-      3 => %{label: "Processing Code", content_type: :numeric, length_mode: :fixed, length: 6},
-      4 => %{
-        label: "Amount, transaction",
-        content_type: :numeric,
-        length_mode: :fixed,
-        length: 12
-      },
-      5 => %{label: "Amount, settlement", content_type: :numeric, length_mode: :fixed, length: 12},
-      6 => %{
-        label: "Amount, cardholder billing",
-        content_type: :numeric,
-        length_mode: :fixed,
-        length: 12
-      },
-      7 => %{
-        label: "Amount, Transmission date & time (mmddhhmmss)",
-        content_type: :numeric,
-        length_mode: :fixed,
-        length: 10
-      },
-      8 => %{
-        label: "Amount, cardholder billing fee",
-        content_type: :numeric,
-        length_mode: :fixed,
-        length: 8
-      },
-      9 => %{
-        label: "Conversion rate, settlement",
-        content_type: :numeric,
-        length_mode: :fixed,
-        length: 8
-      },
-      10 => %{
-        label: "Conversion rate, cardholder billing",
-        content_type: :numeric,
-        length_mode: :fixed,
-        length: 8
-      },
-      11 => %{
-        label: "System trace audit number",
-        content_type: :numeric,
-        length_mode: :fixed,
-        length: 6
-      },
-      12 => %{
-        label: "Time, local transaction (hhmmss)",
-        content_type: :numeric,
-        length_mode: :fixed,
-        length: 6
-      },
-      13 => %{
-        label: "Date, local transaction (MMDD)",
-        content_type: :numeric,
-        length_mode: :fixed,
-        length: 4
-      },
-      14 => %{
-        label: "Date, expiration (YYMM)",
-        content_type: :numeric,
-        length_mode: :fixed,
-        length: 4
-      },
-      15 => %{label: "Date, settlement", content_type: :numeric, length_mode: :fixed, length: 4},
-      16 => %{
-        label: "Date, conversion (MMDD)",
-        content_type: :numeric,
-        length_mode: :fixed,
-        length: 4
-      },
-      17 => %{
-        label: "Date, capture (MMDD)",
-        content_type: :numeric,
-        length_mode: :fixed,
-        length: 4
-      },
-      18 => %{label: "Merchant's type", content_type: :numeric, length_mode: :fixed, length: 4},
-      19 => %{
-        label: "Acquiring institution country code",
-        content_type: :numeric,
-        length_mode: :fixed,
-        length: 3
-      },
-      20 => %{
-        label: "Primary account number extended country code",
-        content_type: :numeric,
-        length_mode: :fixed,
-        length: 3
-      },
-      21 => %{
-        label: "Forwarding institution country code",
-        content_type: :numeric,
-        length_mode: :fixed,
-        length: 3
-      },
-      22 => %{
-        label: "Point of service entry mode",
-        content_type: :numeric,
-        length_mode: :fixed,
-        length: 3
-      },
-      23 => %{
-        label: "Application card sequence number",
-        content_type: :numeric,
-        length_mode: :fixed,
-        length: 3
-      },
-      24 => %{
-        label: "Network International identifier (NII)",
-        content_type: :numeric,
-        length_mode: :fixed,
-        length: 3
-      },
-      25 => %{
-        label: "Point of service condition code",
-        content_type: :numeric,
-        length_mode: :fixed,
-        length: 2
-      },
-      26 => %{
-        label: "Point of service capture code",
-        content_type: :numeric,
-        length_mode: :fixed,
-        length: 2
-      },
-      27 => %{
-        label: "Authorizing identification response length",
-        content_type: :numeric,
-        length_mode: :fixed,
-        length: 1
-      },
-      28 => %{
-        label: "Amount, transaction fee",
-        content_type: :x_numeric,
-        length_mode: :fixed,
-        length: 8
-      },
-      29 => %{
-        label: "Amount, settlement fee",
-        content_type: :x_numeric,
-        length_mode: :fixed,
-        length: 8
-      },
-      30 => %{
-        label: "Amount, transaction processing fee",
-        content_type: :x_numeric,
-        length_mode: :fixed,
-        length: 8
-      },
-      31 => %{
-        label: "Amount, settlement processing fee",
-        content_type: :x_numeric,
-        length_mode: :fixed,
-        length: 8
-      },
-      32 => %{
-        label: "Acquiring institution identification code",
-        content_type: :numeric,
-        length_mode: :variable_ll,
-        length: 11
-      },
-      33 => %{
-        label: "Forwarding institution identification codee",
-        content_type: :numeric,
-        length_mode: :variable_ll,
-        length: 11
-      },
-      34 => %{
-        label: "Primary account number, extended",
-        content_type: :numeric,
-        length_mode: :variable_ll,
-        length: 28
-      },
-      35 => %{
-        label: "Track 2 data",
-        content_type: :track_2,
-        length_mode: :variable_ll,
-        length: 37
-      },
-      36 => %{
-        label: "Track 3 data",
-        content_type: :numeric,
-        length_mode: :variable_ll,
-        length: 104
-      },
-      37 => %{
-        label: "Retrieval reference number",
-        content_type: :alphanumeric,
-        length_mode: :fixed,
-        length: 12
-      },
-      38 => %{
-        label: "Authorization identification response",
-        content_type: :alphanumeric,
-        length_mode: :fixed,
-        length: 6
-      },
-      39 => %{
-        label: "Response code",
-        content_type: :alphanumeric,
-        length_mode: :fixed,
-        length: 2
-      },
-      40 => %{
-        label: "Service restriction code",
-        content_type: :alphanumeric,
-        length_mode: :fixed,
-        length: 3
-      },
-      41 => %{
-        label: "Card acceptor terminal identification",
-        content_type: :alphanumeric,
-        length_mode: :fixed,
-        length: 8
-      },
-      42 => %{
-        label: "Card acceptor identification code",
-        content_type: :alphanumeric,
-        length_mode: :fixed,
-        length: 15
-      },
-      43 => %{
-        label: "Card acceptor name/location (1-23 address 24-36 city 37-38 state 39-40 country",
-        content_type: :alphanumeric,
-        length_mode: :fixed,
-        length: 40
-      },
-      44 => %{
-        label: "Additional response data",
-        content_type: :alphanumeric,
-        length_mode: :variable_ll,
-        length: 25
-      },
-      45 => %{
-        label: "Track 1 data",
-        content_type: :alphanumeric,
-        length_mode: :variable_ll,
-        length: 76
-      },
-      46 => %{
-        label: "Additional data - ISO",
-        content_type: :alphanumeric,
-        length_mode: :variable_lll,
-        length: 999
-      },
-      47 => %{
-        label: "Additional data - National",
-        content_type: :alphanumeric,
-        length_mode: :variable_lll,
-        length: 999
-      },
-      48 => %{
-        label: "Additional data - Private",
-        content_type: :alphanumeric,
-        length_mode: :variable_lll,
-        length: 999
-      },
-      49 => %{
-        label: "Currency code, transaction",
-        content_type: :alphanumeric,
-        length_mode: :fixed,
-        length: 3
-      },
-      50 => %{
-        label: "Currency code, settlement",
-        content_type: :alphanumeric,
-        length_mode: :fixed,
-        length: 3
-      },
-      51 => %{
-        label: "Currency code, cardholder billing",
-        content_type: :alphanumeric,
-        length_mode: :fixed,
-        length: 3
-      },
-      52 => %{
-        label: "Personal identification number data",
-        content_type: :binary,
-        length_mode: :fixed,
-        length: 64
-      },
-      53 => %{
-        label: "Security related control information",
-        content_type: :numeric,
-        length_mode: :fixed,
-        length: 16
-      },
-      54 => %{
-        label: "Additional amounts",
-        content_type: :alphanumeric,
-        length_mode: :variable_lll,
-        length: 120
-      },
-      55 => %{
-        label: "Reserved ISO",
-        content_type: :alphanumeric,
-        length_mode: :variable_lll,
-        length: 999
-      },
-      56 => %{
-        label: "Reserved ISO",
-        content_type: :alphanumeric,
-        length_mode: :variable_lll,
-        length: 999
-      },
-      57 => %{
-        label: "Reserved ISO",
-        content_type: :alphanumeric,
-        length_mode: :variable_lll,
-        length: 999
-      },
-      58 => %{
-        label: "Reserved ISO",
-        content_type: :alphanumeric,
-        length_mode: :variable_lll,
-        length: 999
-      },
-      59 => %{
-        label: "Reserved ISO",
-        content_type: :alphanumeric,
-        length_mode: :variable_lll,
-        length: 999
-      },
-      60 => %{
-        label: "Reserved ISO",
-        content_type: :alphanumeric,
-        length_mode: :variable_lll,
-        length: 999
-      },
-      61 => %{
-        label: "Reserved private",
-        content_type: :alphanumeric,
-        length_mode: :variable_lll,
-        length: 999
-      },
-      62 => %{
-        label: "Reserved private",
-        content_type: :alphanumeric,
-        length_mode: :variable_lll,
-        length: 999
-      },
-      63 => %{
-        label: "Reserved private",
-        content_type: :alphanumeric,
-        length_mode: :variable_lll,
-        length: 999
-      },
-      64 => %{
-        label: "Message authentication code (MAC)",
-        content_type: :binary,
-        length_mode: :fixed,
-        length: 16
-      }
+  test "Parses 0200 message" do
+    message_0200_hex =
+      <<
+        0x00,
+        0x8B,
+        0x60,
+        0x00,
+        0x24,
+        0x14,
+        0x01,
+        # mti
+        0x02,
+        0x00,
+        # bitmap
+        # 00110010 00111000 00000101 10000000 00100000 11000001 10000000 00011110
+        0x32,
+        0x38,
+        0x05,
+        0x80,
+        0x20,
+        0xC1,
+        0x80,
+        0x1E,
+        # procesing code
+        0x00,
+        0x00,
+        0x00,
+        # other
+        0x00,
+        0x00,
+        0x00,
+        0x02,
+        0x28,
+        0x00,
+        0x03,
+        0x26,
+        0x09,
+        0x23,
+        0x45,
+        0x00,
+        0x04,
+        0x62,
+        0x09,
+        0x23,
+        0x45,
+        0x03,
+        0x26,
+        0x00,
+        0x21,
+        0x00,
+        0x02,
+        0x00,
+        # track 2
+        0x37,
+        0x46,
+        0x29,
+        0x93,
+        0x00,
+        0x06,
+        0x14,
+        0x31,
+        0x36,
+        0xD2,
+        0x01,
+        0x21,
+        0x21,
+        0x10,
+        0x22,
+        0x22,
+        0x72,
+        0x00,
+        0x00,
+        0x0F,
+        # 41
+        0x30,
+        0x30,
+        0x30,
+        0x32,
+        0x36,
+        0x39,
+        0x32,
+        0x34,
+        # 42
+        0x30,
+        0x30,
+        0x30,
+        0x30,
+        0x30,
+        0x30,
+        0x34,
+        0x30,
+        0x34,
+        0x36,
+        0x37,
+        0x39,
+        0x30,
+        0x30,
+        0x31,
+        # 48
+        0x00,
+        0x03,
+        0x30,
+        0x30,
+        0x31,
+        # 49
+        0x32,
+        0x31,
+        0x34,
+        0x00,
+        0x11,
+        0x43,
+        0x41,
+        0x54,
+        0x43,
+        0x48,
+        0x45,
+        0x52,
+        0x20,
+        0x32,
+        0x2E,
+        0x30,
+        0x00,
+        0x06,
+        0x30,
+        0x30,
+        0x30,
+        0x30,
+        0x30,
+        0x31,
+        0x00,
+        0x06,
+        0x30,
+        0x30,
+        0x30,
+        0x30,
+        0x31,
+        0x31,
+        0x00,
+        0x15,
+        0x34,
+        0x31,
+        0x30,
+        0x30,
+        0x30,
+        0x30,
+        0x30,
+        0x30,
+        0x30,
+        0x30,
+        0x30,
+        0x30,
+        0x30,
+        0x30,
+        0x43
+      >>
+
+    message_0200_parsed = %{
+      3 => "000000",
+      4 => "000000022800",
+      7 => "0326092345",
+      # 9 => "41000000000000C",
+      11 => "000462",
+      12 => "092345",
+      13 => "0326",
+      22 => "021",
+      24 => "002",
+      25 => "00",
+      35 => "4629930006143136=20121211022227200000",
+      41 => "00026924",
+      42 => "000000404679001",
+      48 => "001",
+      49 => "214",
+      60 => "CATCHER 2.0",
+      61 => "000001",
+      62 => "000011",
+      63 => "41000000000000C"
     }
 
-    message_0210_hex = <<
-      0x00,
-      0x40,
-      0x60,
-      0x14,
-      0x01,
-      0x00,
-      0x24,
-      0x02,
-      0x10,
-      0x20,
-      0x38,
-      0x01,
-      0x00,
-      0x0A,
-      0x80,
-      0x04,
-      0x00,
-      0x00,
-      0x00,
-      0x00,
-      0x00,
-      0x03,
-      0x98,
-      0x09,
-      0x23,
-      0x23,
-      0x03,
-      0x26,
-      0x00,
-      0x02,
-      0x32,
-      0x30,
-      0x38,
-      0x35,
-      0x30,
-      0x39,
-      0x32,
-      0x32,
-      0x30,
-      0x36,
-      0x32,
-      0x32,
-      0x35,
-      0x31,
-      0x30,
-      0x30,
-      0x30,
-      0x35,
-      0x37,
-      0x34,
-      0x34,
-      0x31,
-      0x00,
-      0x12,
-      0x30,
-      0x30,
-      0x30,
-      0x30,
-      0x30,
-      0x30,
-      0x30,
-      0x30,
-      0x30,
-      0x30,
-      0x30,
-      0x30
-    >>
+    assert message_0200_parsed == ISO8583.parse_message(message_0200_hex)
+  end
+
+  test "Parses 0210 message" do
+    message_0210_hex =
+      <<0x00, 0x40, 0x60, 0x14, 0x01, 0x00, 0x24, 0x02, 0x10, 0x20, 0x38, 0x01, 0x00, 0x0A, 0x80,
+        0x04, 0x00, 0x00, 0x00, 0x00, 0x00, 0x03, 0x98, 0x09, 0x23, 0x23, 0x03, 0x26, 0x00, 0x02,
+        0x32, 0x30, 0x38, 0x35, 0x30, 0x39, 0x32, 0x32, 0x30, 0x36, 0x32, 0x32, 0x35, 0x31, 0x30,
+        0x30, 0x30, 0x35, 0x37, 0x34, 0x34, 0x31, 0x00, 0x12, 0x30, 0x30, 0x30, 0x30, 0x30, 0x30,
+        0x30, 0x30, 0x30, 0x30, 0x30, 0x30>>
 
     message_0210_parsed = %{
       03 => "000000",
@@ -511,6 +248,43 @@ defmodule ISO8583Test do
       54 => "000000000000"
     }
 
-    assert message_0210_parsed == ISO8583.parse_message(fields_descriptors, message_0210_hex)
+    assert message_0210_parsed == ISO8583.parse_message(message_0210_hex)
+  end
+
+  test "Parses 0500 message" do
+    message_0500_hex =
+      <<0x00, 0x7F, 0x60, 0x00, 0x24, 0x14, 0x06, 0x05, 0x00, 0x22, 0x22, 0x01, 0x00, 0x00, 0xC0,
+        0x00, 0x16, 0x92, 0x00, 0x00, 0x03, 0x26, 0x09, 0x22, 0x52, 0x00, 0x03, 0x67, 0x03, 0x26,
+        0x00, 0x02, 0x4D, 0x38, 0x30, 0x30, 0x33, 0x36, 0x32, 0x31, 0x30, 0x30, 0x30, 0x30, 0x30,
+        0x30, 0x34, 0x33, 0x34, 0x32, 0x36, 0x38, 0x30, 0x30, 0x31, 0x00, 0x11, 0x43, 0x41, 0x54,
+        0x43, 0x48, 0x45, 0x52, 0x20, 0x32, 0x2E, 0x30, 0x00, 0x06, 0x30, 0x30, 0x30, 0x30, 0x30,
+        0x33, 0x00, 0x51, 0x31, 0x32, 0x30, 0x30, 0x30, 0x30, 0x32, 0x30, 0x30, 0x30, 0x30, 0x30,
+        0x30, 0x34, 0x35, 0x31, 0x39, 0x30, 0x30, 0x30, 0x30, 0x30, 0x30, 0x30, 0x30, 0x30, 0x30,
+        0x30, 0x30, 0x30, 0x30, 0x30, 0x30, 0x30, 0x30, 0x30, 0x30, 0x30, 0x30, 0x30, 0x30, 0x30,
+        0x30, 0x30, 0x30, 0x30, 0x30, 0x30, 0x30, 0x30, 0x30>>
+
+    message_0500_parsed = %{
+      3 => "920000",
+      11 => "000367",
+      24 => "002",
+      41 => "M8003621",
+      7 => "0326092252",
+      15 => "0326",
+      42 => "000000434268001",
+      60 => "CATCHER 2.0",
+      62 => "000003",
+      63 => "120000200000045190000000000000000000000000000000000"
+    }
+
+    assert message_0500_parsed == ISO8583.parse_message(message_0500_hex)
+  end
+
+  test "Parses track2" do
+    track2_field_hex =
+      <<0x46, 0x29, 0x93, 0x00, 0x06, 0x14, 0x31, 0x36, 0xD2, 0x01, 0x21, 0x21, 0x10, 0x22, 0x22,
+        0x72, 0x00, 0x00, 0x0F>>
+
+    assert {:ok, "4629930006143136=20121211022227200000"} =
+             ISO8583.parse_field_track2(:variable_ll, 37, track2_field_hex)
   end
 end
