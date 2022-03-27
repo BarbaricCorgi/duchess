@@ -2,9 +2,46 @@ defmodule ISO8583 do
   @moduledoc """
   Documentation for `ISO8583`.
   """
+  require Logger
 
-  def parse_message( _ ) do
-    %{ }
+
+  def parse_message( fields_descriptors, message_hex) do
+    << _::binary-size(7), mti_rest :: bitstring >> = message_hex
+    << _::binary-size(2), header_rest :: bitstring >> = mti_rest
+    << bitmap_hex::binary-size(8), bitmap_rest :: bitstring >> = header_rest
+    bitmap = parse_bitmap(bitmap_hex)
+
+    parse_fields(fields_descriptors, bitmap, bitmap_rest, %{}, fields_descriptors[List.first(bitmap)][:content_type])
+  end
+
+
+  # Base case: if bits have run out, stop
+  def parse_fields(_, [], _, result_map, _), do: result_map
+
+  def parse_fields(fields_descriptors, fields_list, hex, result_map, :numeric) do
+    [current_field | other_fields] = fields_list
+    field_size = ceil(fields_descriptors[current_field][:length] / 2)
+    << current_hex :: binary-size(field_size), rest_hex :: bitstring >> = hex
+
+    {:ok, field_value} = parse_field_numeric(fields_descriptors[current_field][:length_mode],
+    fields_descriptors[current_field][:length],
+    current_hex )
+    result_map = Map.put(result_map, current_field, field_value)
+
+    parse_fields(fields_descriptors, other_fields, rest_hex, result_map, fields_descriptors[List.first(other_fields)][:content_type])
+  end
+
+  def parse_fields(fields_descriptors, fields_list, hex, result_map, :alphanumeric) do
+    [current_field | other_fields] = fields_list
+    field_size = fields_descriptors[current_field][:length]
+    << current_hex :: binary-size(field_size), rest_hex :: bitstring >> = hex
+
+    {:ok, field_value} = parse_field_alphanumeric(fields_descriptors[current_field][:length_mode],
+    fields_descriptors[current_field][:length],
+    current_hex )
+    result_map = Map.put(result_map, current_field, field_value)
+
+    parse_fields(fields_descriptors, other_fields, rest_hex, result_map, fields_descriptors[List.first(other_fields)][:content_type])
   end
 
   def parse_bitmap( bitmap_hex ) do
@@ -30,5 +67,19 @@ defmodule ISO8583 do
 
   def parse_field_alphanumeric( :fixed, _, hex ) do
     {:ok, Enum.join(for <<c::utf8 <- hex>>, do: <<c::utf8>>)}
+  end
+
+  def parse_field_numeric( :fixed, _, hex ) do
+    {:ok, parse_field_numeric(hex)}
+  end
+
+  def parse_field_numeric(<< digit :: 4, rest :: bitstring >>), do: Integer.to_string(digit) <> parse_field_numeric(rest)
+
+  # Base case: if bits have run out, stop
+  def parse_field_numeric(<< >>), do: ""
+
+
+  def parse_field_binary( :fixed, _, hex ) do
+    {:ok, Base.encode16(hex)}
   end
 end
