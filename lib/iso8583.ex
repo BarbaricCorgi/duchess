@@ -6,7 +6,7 @@ defmodule ISO8583 do
 
   # ISO8583 - 1987
   @fields_descriptors %{
-    "MTI" => %{
+    :MTI => %{
       label: "Message Type Indicator",
       content_type: :numeric,
       length_mode: :fixed,
@@ -374,14 +374,16 @@ defmodule ISO8583 do
 
   def parse_message(message_hex) do
     <<_::binary-size(7), mti_rest::bitstring>> = message_hex
-    <<_::binary-size(2), header_rest::bitstring>> = mti_rest
+    result = %{}
+    <<mti::binary-size(2), header_rest::bitstring>> = mti_rest
+    result = Map.put(result, :MTI, parse_field_numeric(mti))
     <<bitmap_hex::binary-size(8), bitmap_rest::bitstring>> = header_rest
     bitmap = parse_bitmap(bitmap_hex)
 
     parse_fields(
       bitmap,
       bitmap_rest,
-      %{},
+      result,
       @fields_descriptors[List.first(bitmap)][:content_type],
       @fields_descriptors[List.first(bitmap)][:length_mode]
     )
@@ -640,5 +642,11 @@ defmodule ISO8583 do
 
   def parse_field_binary(:fixed, _, hex) do
     {:ok, Base.encode16(hex)}
+  end
+
+  def inspect(message) do
+    Map.keys(message)|>
+    (fn keys -> Enum.map( keys, fn key -> "#{@fields_descriptors[key][:label]}\nField #{key}: #{message[key]}" end) end).() |>
+    (&(Enum.join( &1, "\n\n"))).()
   end
 end

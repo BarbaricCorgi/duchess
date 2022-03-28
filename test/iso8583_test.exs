@@ -78,7 +78,8 @@ defmodule ISO8583Test do
       60 => "CATCHER 2.0",
       61 => "000001",
       62 => "000011",
-      63 => "41000000000000C"
+      63 => "41000000000000C",
+      :MTI => "0200"
     }
 
     assert message_0200_parsed == ISO8583.parse_message(message_0200_hex)
@@ -101,7 +102,8 @@ defmodule ISO8583Test do
       37 => "208509220622",
       39 => "51",
       41 => "00057441",
-      54 => "000000000000"
+      54 => "000000000000",
+      :MTI => "0210"
     }
 
     assert message_0210_parsed == ISO8583.parse_message(message_0210_hex)
@@ -129,10 +131,35 @@ defmodule ISO8583Test do
       42 => "000000434268001",
       60 => "CATCHER 2.0",
       62 => "000003",
-      63 => "120000200000045190000000000000000000000000000000000"
+      63 => "120000200000045190000000000000000000000000000000000",
+      :MTI => "0500"
     }
 
     assert message_0500_parsed == ISO8583.parse_message(message_0500_hex)
+  end
+
+  test "Parses 0510 message" do
+    message_0510_hex =
+      <<0x00, 0x43, 0x60, 0x14, 0x06, 0x00, 0x24, 0x05, 0x10, 0x20, 0x38, 0x01, 0x00, 0x0A, 0x80,
+        0x00, 0x02, 0x92, 0x00, 0x00, 0x00, 0x03, 0x67, 0x09, 0x18, 0x46, 0x03, 0x26, 0x00, 0x02,
+        0x32, 0x30, 0x38, 0x35, 0x37, 0x37, 0x34, 0x30, 0x30, 0x37, 0x31, 0x36, 0x30, 0x30, 0x4D,
+        0x38, 0x30, 0x30, 0x33, 0x36, 0x32, 0x31, 0x00, 0x15, 0x43, 0x49, 0x45, 0x52, 0x52, 0x45,
+        0x20, 0x43, 0x4F, 0x4D, 0x50, 0x4C, 0x45, 0x54, 0x4F>>
+
+    message_0510_parsed = %{
+      3 => "920000",
+      11 => "000367",
+      24 => "002",
+      41 => "M8003621",
+      63 => "CIERRE COMPLETO",
+      12 => "091846",
+      13 => "0326",
+      37 => "208577400716",
+      39 => "00",
+      :MTI => "0510"
+    }
+
+    assert message_0510_parsed == ISO8583.parse_message(message_0510_hex)
   end
 
   test "Parses track2" do
@@ -142,5 +169,50 @@ defmodule ISO8583Test do
 
     assert {:ok, "4629930006143136=20121211022227200000"} =
              ISO8583.parse_field_track2(:variable_ll, 37, track2_field_hex)
+  end
+
+  test "Inspects a message" do
+    message_0510_parsed = %{
+      3 => "920000",
+      11 => "000367",
+      24 => "002",
+      41 => "M8003621",
+      63 => "CIERRE COMPLETO",
+      12 => "091846",
+      13 => "0326",
+      37 => "208577400716",
+      39 => "00",
+      :MTI => "0510"
+    }
+
+    assert "Processing Code
+Field 3: 920000
+
+System trace audit number
+Field 11: 000367
+
+Time, local transaction (hhmmss)
+Field 12: 091846
+
+Date, local transaction (MMDD)
+Field 13: 0326
+
+Network International identifier (NII)
+Field 24: 002
+
+Retrieval reference number
+Field 37: 208577400716
+
+Response code
+Field 39: 00
+
+Card acceptor terminal identification
+Field 41: M8003621
+
+Reserved private
+Field 63: CIERRE COMPLETO
+
+Message Type Indicator
+Field MTI: 0510" == ISO8583.inspect(message_0510_parsed)
   end
 end
