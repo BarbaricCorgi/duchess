@@ -4,6 +4,7 @@ defmodule ISO8583 do
   """
   require Logger
 
+  # emv tags at https://www.eftlab.com/knowledge-base/145-emv-nfc-tags/
   # ISO8583 - 1987
   @fields_descriptors %{
     :MTI => %{
@@ -312,7 +313,7 @@ defmodule ISO8583 do
     },
     55 => %{
       label: "Reserved ISO",
-      content_type: :alphanumeric,
+      content_type: :binary,
       length_mode: :variable_lll,
       length: 999
     },
@@ -373,6 +374,7 @@ defmodule ISO8583 do
   }
 
   def parse_message(message_hex) do
+    # 7 bytes representing tpdu
     <<_::binary-size(7), mti_rest::bitstring>> = message_hex
     result = %{}
     <<mti::binary-size(2), header_rest::bitstring>> = mti_rest
@@ -518,6 +520,32 @@ defmodule ISO8583 do
     )
   end
 
+  def parse_fields(fields_list, hex, result_map, :binary, :variable_lll) do
+    [current_field | other_fields] = fields_list
+
+    <<size::binary-size(2), size_rest_hex::bitstring>> = hex
+
+    padded_size = Bcd.decode(<<0, 0>> <> size)
+    <<field_hex::binary-size(padded_size), rest_hex::bitstring>> = size_rest_hex
+
+    {:ok, field_value} =
+      parse_field_binary(
+        @fields_descriptors[current_field][:length_mode],
+        padded_size,
+        field_hex
+      )
+
+    result_map = Map.put(result_map, current_field, field_value)
+
+    parse_fields(
+      other_fields,
+      rest_hex,
+      result_map,
+      @fields_descriptors[List.first(other_fields)][:content_type],
+      @fields_descriptors[List.first(other_fields)][:length_mode]
+    )
+  end
+
   def parse_fields(fields_list, hex, result_map, :alphanumeric, :variable_lll) do
     [current_field | other_fields] = fields_list
 
@@ -640,13 +668,17 @@ defmodule ISO8583 do
   # Base case: if bits have run out, stop
   def parse_field_track2(<<>>), do: ""
 
-  def parse_field_binary(:fixed, _, hex) do
+  def parse_field_binary(_, _, hex) do
     {:ok, Base.encode16(hex)}
   end
 
   def inspect(message) do
-    Map.keys(message)|>
-    (fn keys -> Enum.map( keys, fn key -> "#{@fields_descriptors[key][:label]}\nField #{key}: #{message[key]}" end) end).() |>
-    (&(Enum.join( &1, "\n\n"))).()
+    Map.keys(message)
+    |> (fn keys ->
+          Enum.map(keys, fn key ->
+            "#{@fields_descriptors[key][:label]}\nField #{key}: #{message[key]}"
+          end)
+        end).()
+    |> (&Enum.join(&1, "\n\n")).()
   end
 end
